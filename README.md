@@ -5,26 +5,157 @@ the whole piece from the G2's own sequencers, synced to the master clock.
 
 Not affiliated with Clavia. "Nord Modular G2" is used only to say which instrument the files are for.
 
-## Use it
+## Two ways to use it
 
-**In the browser:** open `docs/index.html` (or the GitHub Pages site). Drop a file, pick which lines go to slots A–D,
-listen with the preview player, and save a zip with the `.prf2` performance, the slot patches and a `CONVERSION.txt`
-report. Everything runs locally in the browser; nothing is uploaded.
+| | Browser app | Command line |
+|---|---|---|
+| Install | nothing | Python, Git, g2ools (one-time setup below) |
+| Best for | trying it out, picking lines by ear | batch work, scripting, exact options |
+| Output | a zip you download | a folder next to your file |
 
-**From the command line:**
+Both produce byte-identical `.prf2`/`.pch2` files for the same settings.
+
+## Option 1: the browser app (no install)
+
+1. Get the project: on this GitHub page click **Code → Download ZIP** and unzip it (or use the GitHub Pages site if it
+   is turned on for this repository).
+2. Open `docs/index.html` in Chrome, Firefox, Edge or Safari (double-click it).
+3. Drop a `.mid`, `.nsf`, `.nsfe` or `.sid` file onto the big display, or click it to choose one.
+   Want something to try? Use the files in `examples/`.
+4. Choose which lines go to slots A–D and the mode (3 parts + control slot, 4 parts, or one line chained A→B→C→D).
+5. Press play to hear a preview, and change the choices until it sounds right.
+6. Save. You get a zip with the `.prf2` performance, one `.pch2` patch per slot and a `CONVERSION.txt` report.
+
+Everything runs on your own computer; your file is never uploaded.
+
+## Option 2: the command line
+
+### What you need
+
+- **Python 3** (tested with 3.11): [python.org/downloads](https://www.python.org/downloads/).
+  On Windows, tick **"Add python.exe to PATH"** in the installer.
+- **Git**: [git-scm.com](https://git-scm.com/downloads). On Windows this also gives you **Git Bash**, which the setup
+  script needs.
+
+Check both are installed by opening a terminal (PowerShell or Git Bash on Windows, Terminal on macOS/Linux):
 
 ```
-bash python/setup_g2ools.sh            # once: installs g2ools and applies python/g2ools-fixes.patch
-export G2OOLS=$HOME/g2ools
+python --version
+git --version
+```
+
+(On macOS/Linux, use `python3` and `pip3` wherever this guide says `python` and `pip`.)
+
+### Install (once)
+
+**1. Download the project**
+
+```
+git clone https://github.com/netvids/g2tomidi.git
+cd g2tomidi
+```
+
+**2. Install g2ools.** midi2g2 writes G2 files with [g2ools](https://github.com/msg/g2ools). This script downloads the
+tested version into a `g2ools` folder in your home folder and applies the fixes midi2g2 needs. On Windows, run it in
+**Git Bash**:
+
+```
+bash python/setup_g2ools.sh
+```
+
+It should end with `g2ools OK`. If you install g2ools anywhere other than your home folder, tell midi2g2 where it is
+(do this in every new terminal, or add it to your profile):
+
+```
+export G2OOLS=/path/to/g2ools          # macOS / Linux / Git Bash
+$env:G2OOLS = "C:\path\to\g2ools"      # Windows PowerShell
+```
+
+**3. Install the Python packages** (`mido` reads MIDI; `py65` runs NES and C64 music drivers):
+
+```
 pip install -r requirements.txt
-python python/midi2g2.py song.mid      # writes "song G2/" next to the file
-python python/midi2g2.py song.mid --list
+```
+
+**4. Check it works** by converting the example:
+
+```
+python python/midi2g2.py "examples/Ode to Joy test.mid"
+```
+
+You should see the tempo, length and slots it chose, then `wrote ...`. The result is in a new folder,
+`examples/Ode to Joy test G2/`.
+
+### Convert your own files
+
+**1. See what is in the file.** This lists every melody line found, with a number, and stops:
+
+```
+python python/midi2g2.py "my song.mid" --list
+```
+
+**2. Convert it.** With no options the busiest lines go to slots A–C and slot D is the transpose + reverb slot:
+
+```
+python python/midi2g2.py "my song.mid"
+```
+
+The output goes in a folder named `my song G2` next to your file:
+
+| File | What it is |
+|---|---|
+| `my song.prf2` | the performance: load this on the G2 |
+| `my song A.pch2` … `D.pch2` / `Control.pch2` | the patch for each slot, if you want to load or edit them one by one |
+| `CONVERSION.txt` | report: tempo, length, which line went to which slot, anything left out |
+
+Long pieces are split into several numbered performances.
+
+**3. Fine-tune if needed.** Useful options (combine as many as you like):
+
+| Option | What it does |
+|---|---|
+| `--list` | show the lines found and stop |
+| `--pick 3,0,5` | use these line numbers from `--list`, in slot order A, B, C… |
+| `--parts 4` | 4 part slots and no control/reverb slot (1–4) |
+| `--chain` | play ONE line across slots A→B→C→D, for longer pieces |
+| `--grid 4` | steps per beat: 2, 3, 4 (16ths), 6, 8 or 12. Default: chosen automatically |
+| `--sound 5` | starting sound 1–8 for every slot |
+| `--bends follow` | pitch bend: `main` (default), `follow` in semitone steps, or `off` |
+| `--start 32 --end 96` | convert only a section, in beats (quarter notes) from the start |
+| `--bpm 100` | override the file's tempo |
+| `--no-loop` | do not loop the piece |
+| `--song 2` | NSF / NSFe / SID: which song of the file |
+| `--out "My Folder"` | choose the output folder |
+
+Examples:
+
+```
 python python/midi2g2.py song.mid --pick 3,0,5 --parts 4 --grid 4 --start 32 --end 96
 python python/midi2g2.py game.nsf --song 2
 python python/midi2g2.py tune.sid --chain
 ```
 
-Both give byte-identical files for the same settings.
+Run `python python/midi2g2.py --help` for the full list.
+
+## Load it on the G2
+
+1. Connect the G2 to your computer and open the Nord Modular G2 editor.
+2. Open the `.prf2` file from the output folder and send it to the synth (store it in a performance location if you
+   want to keep it).
+3. It plays: the performance is saved with the master clock running at the piece's tempo, and every slot's
+   sequencers follow it. Stopping and starting the master clock plays it again from the top.
+4. In the default mode, slot D listens to the keyboard: play a key to transpose the whole piece (C3 = original
+   key; it holds until the next key). Its knobs on page A1 set the room reverb: time, brightness, return and volume.
+
+## Troubleshooting
+
+| Message | Fix |
+|---|---|
+| `g2ools not found` | run step 2 of the install, or set `G2OOLS` to where g2ools is |
+| `mido is missing` / `No module named py65` | run `pip install -r requirements.txt` |
+| `python3: command not found` at the end of the setup script (Windows) | g2ools is already installed; only the script's last check failed. Carry on with step 3; step 4 shows whether it all works |
+| `python` opens the Microsoft Store (Windows) | install Python from python.org with "Add to PATH" ticked, then open a new terminal |
+| The G2 editor refuses a file | it should not happen (files stay under 64 KB); please open an issue with the source file |
 
 ## What it does
 
