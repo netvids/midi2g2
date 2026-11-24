@@ -413,7 +413,7 @@ def write_chain(a, name, short, line, lines, bpm, section=None):
     if section: summary.insert(1, f'Section: beats {section[0]:g} to {section[1]:g}')
     others = [l for l in lines if l is not src and l['kind'] == 'line']
     if others: summary.append('Not included: ' + ', '.join(f"{l['name']} ({len(l['notes'])} notes)" for l in others))
-    open(f'{outdir}/CONVERSION.txt', 'w').write('\n'.join(summary) + '\n')
+    open(f'{outdir}/CONVERSION.txt', 'w', encoding='utf-8', newline='\n').write('\n'.join(summary) + '\n')
     print('\n'.join(summary)); print('wrote', *files, sep='\n  ')
 
 # ---------------------------------------------------------------- main
@@ -527,7 +527,7 @@ def main():
                'Slots: ' + '; '.join(f'{"ABCD"[i]} = {r} (starts on variation {roles[i] + 1} {(C.CHORD_SOUNDS if chosen[i]["kind"] == "chords" else SOUNDS)[roles[i]][0]})' for i, r in enumerate(report))]
     if section: summary.insert(1, f'Section: beats {section[0]:g} to {section[1]:g}')
     if dropped_lines: summary.append('Not included: ' + ', '.join(f"{l['name']} ({len(l['notes'])} notes)" for l in dropped_lines))
-    open(f'{outdir}/CONVERSION.txt', 'w').write('\n'.join(summary) + '\n')
+    open(f'{outdir}/CONVERSION.txt', 'w', encoding='utf-8', newline='\n').write('\n'.join(summary) + '\n')
     print('\n'.join(summary)); print('wrote', *files, sep='\n  ')
 
 
