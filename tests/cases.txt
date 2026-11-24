@@ -1,0 +1,40 @@
+ode1|Ode to Joy test|
+ode2|Ode to Joy test|--parts 4 --sound 3
+ode3|Ode to Joy test|--pick 1,2,5
+bach|Bach prelude x3 test|
+bach2|Bach prelude x3 test|--grid 2 --parts 2
+canon|Canon chords test|
+canon2|Canon chords test|--pick 4 --parts 1
+canon3|Canon chords test|--pick 0,4,5 --sound 5 --bpm 100
+canon4|Canon chords test|--grid 8 --pick 4,0
+four|Four long lines test|--parts 4
+four3|Four long lines test|
+lc|Lines and chords long test|--parts 4
+lc2|Lines and chords long test|--pick 0,1,4,6 --parts 4
+spec|Spec edge cases test|--parts 4
+spec2|Spec edge cases test|--pick 2,0
+spec3|Spec edge cases test|--bends follow --parts 4
+spec4|Spec edge cases test|--bends off --parts 4
+fast|Fast 32nds test|
+slow|Slow 8ths test|
+chain1|Four long lines test|--chain
+chain2|Four long lines test|--chain --pick 3 --sound 2
+chain3|Bach prelude x3 test|--chain
+chain4|Canon chords test|--chain --pick 0
+gm1|Ode band GM test|--parts 4
+gm2|Ode band GM test|
+gm3|Ode band GM test|--chain
+gm4|Ode band GM test|--pick 6,7 --parts 2
+sec1|Four long lines test|--start 16 --end 80
+sec2|Lines and chords long test|--start 32 --end 96.5 --parts 4
+sec3|Bach prelude x3 test|--chain --start 140
+sec4|Canon chords test|--end 10
+sec5|Spec edge cases test|--bends follow --start 1 --end 3 --parts 4
+nsf1|Ode to Joy test.nsf|
+nsf2|Ode to Joy test.nsf|--chain --song 1
+nsf3|Ode to Joy test.nsf|--parts 4 --start 4 --end 20
+nsfe1|Ode to Joy test.nsfe|
+nsfe2|Ode to Joy test.nsfe|--chain
+sid1|Ode to Joy test.sid|
+sid2|Ode to Joy irq test.sid|--chain
+sid3|Ode to Joy test.sid|--parts 4 --start 4 --end 20 --song 1

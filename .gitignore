@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.DS_Store
+# converter output
+* G2/

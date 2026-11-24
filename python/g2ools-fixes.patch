@@ -1,0 +1,41 @@
+diff --git a/nord/g2/file.py b/nord/g2/file.py
+index a89bd48..8addb46 100644
+--- a/nord/g2/file.py
++++ b/nord/g2/file.py
+@@ -214,6 +214,7 @@ class ModuleList(Section):
+     for module in area.modules:
+       write_bits(8, module.type.id)
+       module.reserved = 0 # just in case is wasn't set
++      self.fixleds(module)
+       for attr, nbits in self.module_params:
+         bitstream.write_bits(nbits, getattr(module, attr))
+       self.fixleds(module)
+@@ -669,9 +670,9 @@ class Labels(Section):
+   def format_morphs(self, morphs, bitstream):
+     bitstream.write_bits(2, SETTINGS)
+     bitstream.write_str('\1\1\x50')
+-    s = bytearray([1, 1, 0])
++    s = bytearray([1, 8, 0])   # [type, len (param byte + 7 chars), param index 8..15]
+     for morph in morphs:
+-      s[2] = 8 + morph.index
++      s[2] = 7 + morph.index
+       bitstream.write_bytes(s)
+       write_string(bitstream, morph.label, 7, pad=True)
+     return bitstream.tell_bit()
+@@ -768,6 +769,7 @@ class ModuleNames(Section):
+   type = 0x5a
+   def parse_area(self, area, bitstream):
+     areai, nmodules = bitstream.read_bitsa([6, 8])
++    area.names_unknown = areai
+     for i in range(nmodules):
+       module = area.find_module(bitstream.read_bits(8))
+       module.name = read_string(bitstream, 16)
+@@ -779,7 +781,7 @@ class ModuleNames(Section):
+     self.parse_area(area, bitstream)
+ 
+   def format_area(self, area, bitstream):
+-    bitstream.write_bitsa([2, 6, 8], [area.index, self.area, len(area.modules)])
++    bitstream.write_bitsa([2, 6, 8], [area.index, getattr(area, 'names_unknown', 0), len(area.modules)])
+     for module in area.modules:
+       bitstream.write_bits(8, module.index)
+       write_string(bitstream, module.name, 16)
