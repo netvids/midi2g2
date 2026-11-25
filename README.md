@@ -13,6 +13,10 @@ the whole piece from the G2's own sequencers, synced to the master clock.
 
 Both give exactly the same files for the same choices.
 
+![The midi2g2 browser page with the Ode to Joy example loaded: slot buttons, a section overview, each melody line with its starting sound, and the Save button](screenshots/browser-page.png)
+
+*The browser page with `examples/Ode to Joy test.mid` loaded.*
+
 Not affiliated with Clavia. "Nord Modular G2" is used only to say which instrument the files are for.
 
 ## Install and run
@@ -206,6 +210,7 @@ Run `python python/midi2g2.py --help` for the full list.
 | `python/templates.json` | pre-built, verified patch templates with their sizes (`make_templates.py` regenerates them) |
 | `tests/` | public-domain test inputs, `cases.txt`, and `run_tests.py` (converts every case and checks it with `verify.py`) |
 | `examples/` | public-domain example files (Ode to Joy as MIDI, NSF, NSFe and SID) |
+| `screenshots/` | the screenshot shown above |
 
 After editing: `python python/make_templates.py` (only if patch layouts changed), then `python tests/run_tests.py`.
 
