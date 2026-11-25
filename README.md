@@ -63,7 +63,27 @@ python python/midi2g2.py "examples/Ode to Joy test.mid"
 You should see the tempo, length and slots it chose, then `wrote ...`. The result is in a new folder,
 `examples/Ode to Joy test G2/`.
 
-### Convert your own files
+### Use it in your browser (easiest)
+
+```
+python python/gui.py
+```
+
+Your browser opens the midi2g2 page (at `http://127.0.0.1:8000`; if it doesn't open by itself, paste that address).
+Leave the terminal open while you use it, and press **Ctrl+C** there to stop.
+
+1. Drop a `.mid`, `.nsf`, `.nsfe` or `.sid` file onto the big display, or click it to choose one.
+   Want something to try? Use the files in `examples/`.
+2. Choose which lines go to slots A–D and the mode (3 parts + control slot, 4 parts, or one line chained A→B→C→D).
+   Adjust the grid, tempo or section if you like.
+3. Press play to hear a preview, and change the choices until it sounds right.
+4. Press **Save G2 files**. You get a zip with the `.prf2` performance, one `.pch2` patch per slot and a
+   `CONVERSION.txt` report.
+
+The page runs only on your computer and the conversion is done by `midi2g2.py` itself, so the files are exactly the
+same as from the command line with the same choices.
+
+### Convert your own files from the command line
 
 **1. See what is in the file.** This lists every melody line found, with a number, and stops:
 
@@ -130,6 +150,7 @@ Run `python python/midi2g2.py --help` for the full list.
 |---|---|
 | `g2ools not found` | run step 2 of the install, or set `G2OOLS` to where g2ools is |
 | `mido is missing` / `No module named py65` | run `pip install -r requirements.txt` |
+| The page says "Lost contact with midi2g2" | the terminal running `gui.py` was closed or stopped: run `python python/gui.py` again and reload the page |
 | `python3: command not found` at the end of the setup script (Windows) | g2ools is already installed; only the script's last check failed. Carry on with step 3; step 4 shows whether it all works |
 | `python` opens the Microsoft Store (Windows) | install Python from python.org with "Add to PATH" ticked, then open a new terminal |
 | The G2 editor refuses a file | it should not happen (files stay under 64 KB); please open an issue with the source file |
@@ -158,6 +179,8 @@ Run `python python/midi2g2.py --help` for the full list.
 | Path | What |
 |---|---|
 | `python/` | the converter (`midi2g2.py`), readers (`nsf.py`, `sid.py`), chord and chain slots, `g2lib.py` helpers, `verify.py` |
+| `python/gui.py` | the browser page's server: `python python/gui.py` serves `gui/` and converts with `midi2g2.py` |
+| `gui/` | the browser page (`index.html`, `app.js`, the preview player `player.js`, and `api.js`, which asks `gui.py` to read and convert) |
 | `python/templates.json` | pre-built, verified patch templates with their sizes (`make_templates.py` regenerates them) |
 | `tests/` | public-domain test inputs, `cases.txt`, and `run_tests.py` (converts every case and checks it with `verify.py`) |
 | `examples/` | public-domain example files (Ode to Joy as MIDI, NSF, NSFe and SID) |

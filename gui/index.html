@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>midi2g2 – MIDI to Nord Modular G2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&family=VT323&display=swap" rel="stylesheet">
+<style>
+/* Nord Modular G2 skin: red case, lilac front panel, green LCDs, rubber buttons with LEDs, editor modules */
+:root{
+  --case:#c3161c; --case-lo:#9c0f14; --panel:#aaabbe; --panel-hi:#c4c5d4; --panel-lo:#8c8da3; --print:#22243c;
+  --lcd:#bcd447; --lcd-lo:#a5bd34; --lcd-ink:#1d260b; --rubber:#3b3c45; --rubber-hi:#55565f; --led-off:#5e1a1c; --led:#ff2b2b;
+  --mod:#cfd0d6; --mod-head:#e3c230; --workspace:#9ba0b6;
+  --bg:#c9cad6; --ink:#1b1c26; --muted:#4c4e60; --rule:#6f7186; --well:#eceadb;
+  --red:#c8161e; --yellow:#b88c00; --blue:#2a5cc0; --green:#1d8a38; --on-red:#fff;
+  --modA:#e58a82; --modB:#e8cc4c; --modC:#8fa8e0; --modD:#8fd07c; --mod-ink:#15161d; --mod-sub:#2d2e3a;
+  color-scheme:light;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --case:#5c0d11; --case-lo:#3e080b; --panel:#34353f; --panel-hi:#43444f; --panel-lo:#25262e; --print:#d9dae6;
+  --lcd:#97ad33; --lcd-lo:#7f9327; --lcd-ink:#141a07; --rubber:#1d1e24; --rubber-hi:#33343c; --led-off:#3a1012;
+  --mod:#2c2d36; --mod-head:#b89c22; --workspace:#22232b;
+  --bg:#262730; --ink:#e7e8ef; --muted:#a3a5b8; --rule:#565869; --well:#1c1d23;
+  --red:#ff5a5f; --yellow:#f2c83a; --blue:#6f9cf2; --green:#5ccb72;
+  --modA:#7a3a37; --modB:#7a6922; --modC:#3d4d78; --modD:#3d6b37; --mod-ink:#f1f1f6; --mod-sub:#d4d5e0; color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --case:#5c0d11; --case-lo:#3e080b; --panel:#34353f; --panel-hi:#43444f; --panel-lo:#25262e; --print:#d9dae6;
+  --lcd:#97ad33; --lcd-lo:#7f9327; --lcd-ink:#141a07; --rubber:#1d1e24; --rubber-hi:#33343c; --led-off:#3a1012;
+  --mod:#2c2d36; --mod-head:#b89c22; --workspace:#22232b;
+  --bg:#262730; --ink:#e7e8ef; --muted:#a3a5b8; --rule:#565869; --well:#1c1d23;
+  --red:#ff5a5f; --yellow:#f2c83a; --blue:#6f9cf2; --green:#5ccb72;
+  --modA:#7a3a37; --modB:#7a6922; --modC:#3d4d78; --modD:#3d6b37; --mod-ink:#f1f1f6; --mod-sub:#d4d5e0; color-scheme:dark; }
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;color:var(--ink);font:400 16px/1.5 Barlow,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased;
+  background:var(--case) linear-gradient(170deg,var(--case) 0%,var(--case-lo) 100%) fixed}
+.wrap{max-width:1080px;margin:22px auto 120px;padding:22px;background:var(--panel);border-radius:10px;
+  box-shadow:inset 0 1px 0 var(--panel-hi),inset 0 -2px 0 var(--panel-lo),0 6px 0 var(--case-lo)}
+@media (max-width:700px){.wrap{margin:0 0 120px;border-radius:0;padding:14px}}
+.hidden{display:none!important}
+
+/* ---- header: LCD + knobs */
+header{display:grid;grid-template-columns:minmax(0,auto) 1fr;gap:22px;align-items:center;margin-bottom:20px}
+@media (max-width:760px){header{grid-template-columns:1fr}}
+.lcd{background:var(--lcd);color:var(--lcd-ink);border-radius:4px;padding:8px 16px 10px;font-family:VT323,"Courier New",monospace;
+  box-shadow:inset 0 0 0 3px var(--lcd-lo),inset 0 3px 8px rgba(0,0,0,.28),0 0 0 4px var(--rubber)}
+.lcd h1{font:400 clamp(44px,7vw,64px)/.9 VT323,"Courier New",monospace;margin:0;letter-spacing:.02em}
+.lcd .sub{font-size:22px;line-height:1}
+.knobs{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.knob{width:46px;height:46px;border-radius:50%;flex:none;position:relative;
+  background:radial-gradient(circle at 38% 32%,#5a5b63 0,#2a2b31 55%,#141418 100%);box-shadow:0 0 0 4px #1d1e22,0 3px 0 4px rgba(0,0,0,.35)}
+.knob::after{content:"";position:absolute;left:50%;top:5px;width:3px;height:13px;margin-left:-1.5px;border-radius:2px;background:var(--led);transform-origin:50% 18px;transform:rotate(var(--r,0deg))}
+.lede{margin:0;color:var(--print);max-width:62ch;font-size:15px;line-height:1.45}
+.leds{display:flex;gap:7px;margin-bottom:10px}
+.leds i{width:9px;height:9px;border-radius:50%;background:var(--led-off);display:block}
+.leds i.on{background:var(--led);box-shadow:0 0 6px var(--led)}
+
+/* ---- drop zone: a big display */
+.drop{display:grid;place-items:center;text-align:center;min-height:210px;border-radius:6px;background:var(--rubber);cursor:pointer;padding:18px;
+  box-shadow:inset 0 2px 0 var(--rubber-hi)}
+.drop>div{background:var(--lcd);color:var(--lcd-ink);border-radius:4px;padding:18px 26px;max-width:620px;box-shadow:inset 0 0 0 3px var(--lcd-lo),inset 0 3px 10px rgba(0,0,0,.3)}
+.drop strong{display:block;font:400 32px/1.1 VT323,"Courier New",monospace;margin-bottom:6px}
+.drop span{font:400 19px/1.25 VT323,"Courier New",monospace}
+.drop:hover>div,.drop.over>div{box-shadow:inset 0 0 0 3px var(--lcd-ink),inset 0 3px 10px rgba(0,0,0,.3)}
+.drop:focus-visible{outline:3px solid var(--blue);outline-offset:3px}
+.steps{display:flex;gap:6px;justify-content:center;margin-bottom:12px}
+.steps i{width:12px;height:12px;border-radius:2px;background:rgba(29,38,11,.25);display:block}
+.steps i:nth-child(1),.steps i:nth-child(4),.steps i:nth-child(7){background:var(--lcd-ink)}
+
+/* ---- layout */
+.grid{display:grid;grid-template-columns:280px 1fr;gap:18px;margin-top:18px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--workspace);border-radius:4px;padding:12px;box-shadow:inset 0 2px 4px rgba(0,0,0,.25)}
+
+/* editor modules: grey body, coloured title strip */
+.field,.sect{background:var(--mod);border:1px solid #3c3d48;border-radius:2px;padding:0 10px 10px;margin:0 0 12px;box-shadow:0 2px 0 rgba(0,0,0,.18)}
+.field>label,.field>.lab,.secHead{display:block;margin:0 -10px 9px;padding:3px 10px;background:var(--mod-head);color:#1d1b10;
+  font:700 14px/1.3 "Barlow Semi Condensed","Arial Narrow",sans-serif;border-bottom:1px solid #3c3d48}
+.field small,.secInputs small{display:block;color:var(--muted);margin-top:6px;font-size:13.5px;line-height:1.38}
+h2{font:700 14px/1.3 "Barlow Semi Condensed","Arial Narrow",sans-serif;margin:0}
+
+/* LCD-style value fields */
+select,input[type=number]{font:400 21px/1 VT323,"Courier New",monospace;color:var(--lcd-ink);background:var(--lcd);border:0;border-radius:3px;
+  padding:6px 8px;width:100%;box-shadow:inset 0 0 0 2px var(--lcd-lo),inset 0 2px 5px rgba(0,0,0,.25)}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--lcd-ink) 50%),linear-gradient(135deg,var(--lcd-ink) 50%,transparent 50%);
+  background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;background-size:5px 5px;background-repeat:no-repeat;padding-right:26px}
+select:disabled{opacity:.45}
+select:focus-visible,input:focus-visible,button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+
+/* rubber buttons with an LED */
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button,.tbtn,.slotpick button{font:600 14px/1.15 "Barlow Semi Condensed","Arial Narrow",sans-serif;color:#e9e9ef;background:var(--rubber);border:0;border-radius:4px;
+  cursor:pointer;box-shadow:inset 0 1px 0 var(--rubber-hi),0 2px 0 rgba(0,0,0,.45);position:relative}
+.seg button{flex:1 1 auto;padding:16px 8px 7px;white-space:nowrap}
+.seg button::before,.slotpick button::before{content:"";position:absolute;top:5px;left:50%;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:var(--led-off)}
+.seg button[aria-pressed=true]::before{background:var(--led);box-shadow:0 0 6px var(--led)}
+.seg button:active,.tbtn:active,.slotpick button:active{transform:translateY(1px);box-shadow:inset 0 1px 0 var(--rubber-hi)}
+
+/* file header */
+.file{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.file b{font:400 24px/1.1 VT323,"Courier New",monospace;color:var(--lcd-ink);background:var(--lcd);border-radius:3px;padding:5px 10px;
+  box-shadow:inset 0 0 0 2px var(--lcd-lo);word-break:break-word;max-width:100%}
+.filebtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.linkbtn{font:600 14px/1.2 "Barlow Semi Condensed",sans-serif;background:none;border:0;color:var(--print);cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:3px}
+.tbtn{display:inline-flex;align-items:center;gap:8px;padding:7px 12px 7px 7px}
+.tbtn .pi{width:22px;height:22px;border-radius:50%;background:#1b1c21;color:#e9e9ef;display:grid;place-items:center;box-shadow:inset 0 0 0 1px #000}
+.tbtn .pi svg{width:10px;height:10px}
+.tbtn[aria-pressed=true] .pi{background:var(--led);color:#fff;box-shadow:0 0 8px var(--led)}
+.tbtn:disabled{opacity:.45;cursor:default}
+
+/* section module */
+.sect{margin:4px 0 14px}
+.secHead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.secHead .status{flex:1;min-height:0;color:#3b3610;font-weight:500}
+.secHead .linkbtn{color:#1d1b10}
+canvas.overview{display:block;width:100%;height:84px;border-radius:2px;background:var(--well);cursor:ew-resize;touch-action:none;box-shadow:inset 0 0 0 1px #3c3d48}
+.secInputs{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.secInputs label{font:700 14px/1 "Barlow Semi Condensed",sans-serif}
+.secInputs input{width:86px}
+.secInputs small{flex:1 1 260px;margin-top:0}
+
+/* lines = sequencer modules, coloured by slot like G2 module colours */
+.status{font-size:14px;color:var(--print);min-height:1.2em}
+.panel>.status{margin:0 0 10px}
+.lines{display:flex;flex-direction:column;gap:8px}
+.line{display:grid;grid-template-columns:auto 1fr 180px;gap:12px;align-items:center;padding:8px 10px;border:1px solid #3c3d48;border-radius:2px;
+  background:var(--mod);box-shadow:0 2px 0 rgba(0,0,0,.18)}
+.line.on{background:var(--mc,var(--mod))}
+.line.playing{outline:2px solid var(--led);outline-offset:1px}
+@media (max-width:640px){.line{grid-template-columns:1fr}}
+.slotpick{display:flex;gap:5px}
+.slotpick button{width:36px;height:40px;padding:12px 0 0}
+.slotpick button.wide{width:auto;padding:12px 10px 0}
+.slotpick button[aria-pressed=true]::before{background:var(--led);box-shadow:0 0 6px var(--led)}
+.slotpick button:disabled{opacity:.35;cursor:default}
+.meta{min-width:0}
+.nmrow{display:flex;align-items:center;gap:8px;min-width:0}
+.meta .nm{font:700 16px/1.2 "Barlow Semi Condensed",sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--mod-ink)}
+.line:not(.on) .meta .nm{color:var(--ink)}
+.meta .sub{font-size:13.5px;color:var(--mod-sub)}
+.line:not(.on) .meta .sub{color:var(--muted)}
+canvas.roll{display:block;width:100%;height:34px;margin-top:5px;border-radius:2px;background:var(--well);box-shadow:inset 0 0 0 1px #3c3d48}
+.pbtn{flex:none;width:28px;height:28px;border-radius:50%;border:0;background:var(--rubber);color:#e9e9ef;display:grid;place-items:center;cursor:pointer;padding:0;box-shadow:0 2px 0 rgba(0,0,0,.4)}
+.pbtn svg{width:11px;height:11px}
+.pbtn[aria-pressed=true]{background:var(--led);color:#fff;box-shadow:0 0 8px var(--led)}
+.snd select{font-size:19px}
+
+.summary{margin-top:14px;font-size:14.5px}
+.summary p{margin:0 0 4px}
+.warn{color:var(--red);font-weight:600}
+.note{color:var(--print);font-size:14px;margin:22px 0 0;max-width:76ch}
+.legal{color:var(--print);font-size:13px;margin:16px 0 0;padding-top:12px;border-top:1px solid var(--rule)}
+.legal a{color:inherit}
+
+/* bottom strip: the G2's black top panel with LCD windows */
+.bar{position:fixed;left:0;right:0;bottom:0;background:#202127;border-top:3px solid var(--case);padding:10px 18px calc(10px + env(safe-area-inset-bottom,0px))}
+.bar .in{max-width:1080px;margin:0 auto;display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.bar .facts{display:flex;gap:8px;flex-wrap:wrap}
+.bar .facts div{background:var(--lcd);color:var(--lcd-ink);border-radius:3px;padding:3px 10px 4px;line-height:1;box-shadow:inset 0 0 0 2px var(--lcd-lo);min-width:70px}
+.bar .facts b{display:block;font:400 26px/1 VT323,"Courier New",monospace}
+.bar .facts span{font:400 15px/1 VT323,"Courier New",monospace}
+.bar .status{color:#c9cad6}
+.ptime{font:400 22px/1 VT323,"Courier New",monospace;color:var(--lcd);min-width:96px}
+.bar .tbtn{background:#3b3c45}
+.save{font:700 16px/1 "Barlow Semi Condensed",sans-serif;background:#d8262c;color:#fff;border:0;border-radius:4px;padding:12px 20px;cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 3px 0 #7d0e12}
+.save:active{transform:translateY(2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 1px 0 #7d0e12}
+.save:disabled{opacity:.5;cursor:default}
+@media (max-width:640px){
+  .knob{width:36px;height:36px}.knob::after{top:4px;height:10px;transform-origin:50% 14px}.knobs{gap:14px}.knob:nth-child(n+6){display:none}
+  .bar{padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px))}.bar .in{gap:8px}
+  .bar .facts{flex-wrap:nowrap;overflow-x:auto;width:100%}.bar .facts div{min-width:0;flex:none}.bar .facts b{font-size:21px}.bar .facts span{font-size:13px}
+  .save{padding:10px 14px}.ptime{min-width:0;font-size:19px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="lcd" role="presentation">
+      <div class="sub">MIDI NSF SID &gt; G2</div>
+      <h1>midi2g2</h1>
+    </div>
+    <div>
+      <p class="lede">Drop a MIDI file, an NSF / NSFe file from an NES game or a SID file from a Commodore 64, and get a Nord Modular G2 performance that plays the whole piece, melodies and chords, from the G2’s own sequencers, synced to the master clock.</p>
+    </div>
+  </header>
+
+  <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose a MIDI, NSF or SID file">
+    <div>
+      <div class="steps" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <strong>Drop a MIDI, NSF or SID file here</strong>
+      <span>or click to choose one (.mid, .midi, .nsf / .nsfe from an NES game, or .sid from a Commodore 64)</span>
+    </div>
+  </div>
+  <input id="pick" type="file" accept=".mid,.midi,.nsf,.nsfe,.sid,audio/midi" class="hidden">
+
+  <div id="work" class="hidden">
+    <div class="grid">
+      <aside class="panel">
+        <div class="field">
+          <span class="lab">Slots</span>
+          <div class="seg" id="mode">
+            <button type="button" data-parts="3" aria-pressed="true">3 parts + reverb</button>
+            <button type="button" data-parts="4" aria-pressed="false">4 parts</button>
+            <button type="button" data-parts="chain" aria-pressed="false">1 track A→D</button>
+          </div>
+          <small id="modeHelp">Slot D plays nothing itself: it transposes everything from the keyboard and adds reverb.</small>
+        </div>
+        <div class="field">
+          <label for="grid">Step grid</label>
+          <select id="grid">
+            <option value="">Automatic</option>
+            <option value="2">8ths</option><option value="3">8th triplets</option><option value="4">16ths</option>
+            <option value="6">16th triplets</option><option value="8">32nds</option><option value="12">32nd triplets</option>
+          </select>
+          <small>A coarser grid fits a longer piece in one performance. The G2 always runs at the piece’s real tempo.</small>
+        </div>
+        <div class="field">
+          <label for="bpm">Tempo (BPM)</label>
+          <input id="bpm" type="number" min="20" max="400" step="0.1">
+          <small id="bpmHelp"></small>
+        </div>
+        <div class="field hidden" id="songField">
+          <label for="song">Song in the file</label>
+          <select id="song"></select>
+          <small id="songHelp"></small>
+        </div>
+        <div class="field" id="bendField">
+          <label for="bends">Pitch bend</label>
+          <select id="bends">
+            <option value="main">Main pitch per note</option>
+            <option value="follow">Follow bends in semitone steps</option>
+            <option value="off">Ignore</option>
+          </select>
+          <small>The G2 sequencers hold whole semitones. “Main pitch” gives each note the pitch it holds longest, so scoops and vibrato don’t turn into stepped slides.</small>
+        </div>
+        <div class="field">
+          <span class="lab">Sounds</span>
+          <small style="margin-top:0">Every slot carries all 8 as variations: the one picked here is where it starts.</small>
+        </div>
+      </aside>
+
+      <section class="panel">
+        <div class="file">
+          <b id="fname"></b>
+          <div class="filebtns">
+            <button type="button" class="tbtn" id="playFile" data-play="file" data-label="the whole MIDI file"><span class="pi"></span>Whole file</button>
+            <button type="button" class="tbtn" id="playSel" data-play="sel" data-label="the selected parts in the chosen section"><span class="pi"></span>Selected parts</button>
+            <button type="button" class="linkbtn" id="another">Use another file</button>
+          </div>
+        </div>
+        <div class="sect">
+          <div class="secHead">
+            <h2>Section</h2>
+            <span class="status" id="secText"></span>
+            <button type="button" class="linkbtn hidden" id="secReset">Use the whole song</button>
+          </div>
+          <canvas id="overview" class="overview" role="img" aria-label="Overview of the song with the chosen section. Use the bar fields to change it."></canvas>
+          <div class="secInputs">
+            <label for="barFrom">From bar</label><input id="barFrom" type="number" min="1" step="1" value="1">
+            <label for="barTo">to bar</label><input id="barTo" type="number" min="1" step="1" value="1">
+            <small>Drag the two handles, or type bar numbers. Only this section is converted and played by “Selected parts” and “Play slots”.</small>
+          </div>
+        </div>
+        <p class="status" id="linesHelp"></p>
+        <div class="lines" id="lines"></div>
+        <div class="summary" id="summary"></div>
+      </section>
+    </div>
+    <p class="note">A melody slot holds up to 31 bars of 16 steps: its sequencers and its synth share the voice area. A chord slot plays up to 4 notes at once, each note on its own oscillator straight from its sequencer, with chord changes on a slower step (a beat, two beats or a bar), so it covers far more time per sequencer. Longer pieces come out as several numbered performances. Only convert music you have the rights to use or share.</p>
+  </div>
+  <p class="legal">midi2g2 is free software under the <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener">GNU GPL v3</a>, with no warranty.
+      <a href="https://github.com/netvids/g2tomidi" target="_blank" rel="noopener">Source code on GitHub</a>.
+      Patch templates made with <a href="https://github.com/msg/g2ools" target="_blank" rel="noopener">g2ools</a> (GPL-2.0-or-later).
+      Not affiliated with Clavia; “Nord Modular G2” only names the instrument these files are for.</p>
+</div>
+
+<div class="bar hidden" id="bar">
+  <div class="in">
+    <div class="facts" id="facts"></div>
+    <div class="filebtns">
+      <button type="button" class="tbtn" id="playSlots" data-play="slots" data-label="the slots as the G2 will play them"><span class="pi"></span>Play slots</button>
+      <span class="ptime" id="ptime" aria-live="off"></span>
+    </div>
+    <div style="text-align:right">
+      <button type="button" class="save" id="save">Save G2 files (.zip)</button>
+      <div class="status" id="saveStatus"></div>
+    </div>
+  </div>
+</div>
+<!--M2G-META-->
+<script src="player.js"></script>
+<script src="api.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -376,45 +376,164 @@ def perf_ranges(parts, nbars, per_perf, short, control, align=1):
 
 
 GRID_NAMES = {2: '8ths', 3: '8th triplets', 4: '16ths', 6: '16th triplets', 8: '32nds', 12: '32nd triplets'}
-def write_chain(a, name, short, line, lines, bpm, section=None):
+# ---------------------------------------------------------------- conversion: load_song -> plan -> write
+def load_song(path, bends='main', song=None):
+    """Read a MIDI / NSF / NSFe / SID file into mono lines and chord items.
+    -> dict(name, short, lines, bpm, info, kind, source); info/kind only for chip music."""
+    name = re.sub(r' +', ' ', re.sub(r'[^A-Za-z0-9 \-]', ' ', os.path.splitext(os.path.basename(path))[0])).strip()[:40] or 'Song'
+    data = open(path, 'rb').read(); info = kind = None
+    if data[:4] in (b'NESM', b'NSFE', b'PSID', b'RSID'):         # chip music: run the tune's own player (see nsf.py / sid.py)
+        if data[:4] in (b'PSID', b'RSID'): import sid; tracks, bpm, info = sid.read_sid(data, song); kind = 'SID'
+        else: import nsf; tracks, bpm, info = nsf.read_nsf(data, song); kind = 'NSF'
+        name = f"{name[:34].strip()} s{info['song']}"
+    else: tracks, bpm = read_midi(path, bends)
+    lines = []
+    for tid, t in enumerate(tracks):
+        ls = split_lines(t); chordal = len(ls) > 1 and C.is_chordal(t)
+        for l in ls: l['kind'] = 'line'; l['in_chords'] = chordal; l['tid'] = tid; lines.append(l)
+        if chordal: lines.append(dict(kind='chords', name=f"{t['name']} chords", notes=t['notes'], in_chords=False, program=t.get('program'), tid=tid))
+    for i, l in enumerate(lines):
+        ps = [x[2] for x in l['notes']]; l['id'] = i; l['avg'] = sum(ps) / len(ps)
+    return dict(name=name, short=name[:10].strip(), lines=lines, bpm=bpm, info=info, kind=kind, source=os.path.basename(path))
+
+def chain_default_sound(line):
+    return (7 if line['avg'] < 55 else 0) if (line.get('program') is None and line.get('sound') is None) else default_sound(line, 0, 1)
+
+def plan(S, pick=None, parts=3, grid=None, sound=None, sounds=None, chain=False, section=None, bpm=None, loop=True):
+    """Everything about the conversion except building the patches (fast). pick: line ids in slot order (None = auto);
+    sound: 1-8 for every slot; sounds: 0-7 per slot (None entries = default); section: (start, end) beats.
+    -> dict for write(), with the facts shown to the user (summary, report, note, preview ...)."""
+    lines, bpm = S['lines'], bpm or S['bpm']
+    def role(i, default):
+        if sounds and i < len(sounds) and sounds[i] is not None: return sounds[i]
+        return sound - 1 if sound else default()
+    if chain:
+        cand = [lines[i] for i in pick][:1] if pick else sorted([l for l in lines if l['kind'] == 'line'], key=lambda l: -len(l['notes']))[:1]
+        if not cand or cand[0]['kind'] != 'line': raise ValueError('Chaining needs a single-note line, not a chord item.')
+        return plan_chain(S, cand[0], grid, section, bpm, lambda line: role(0, lambda: chain_default_sound(line)))
+    chosen = [lines[i] for i in pick] if pick else default_pick(lines, parts)
+    if not chosen: raise ValueError('No notes found in this file (drum tracks on channel 10 are skipped).')
+    dropped_lines = [l for l in lines if l['id'] not in {c['id'] for c in chosen} and not (l['in_chords'] and any(c['kind'] == 'chords' for c in chosen))]
+    spb = choose_grid(chosen, grid)
+    g2bpm, div, note = clock_plan(bpm, spb)
+    if section: chosen = [clip(l, *section) for l in chosen]
+    end = (section[1] - section[0]) if section else max(x[1] for l in chosen for x in l['notes'])
+    nv, nf = capacity(); per_perf = nv + nf
+    cinfo = {}
+    for l in chosen:
+        if l['kind'] == 'chords':
+            k = C.choose_chord_step(l, spb); cinfo[l['id']] = k
+    total = int(math.ceil(end * spb / 16)) * 16
+    steps, report, align = [], [], 1               # align: performances must start on a whole chord step
+    for l in chosen:
+        if l['kind'] == 'chords':
+            k = cinfo[l['id']]; K, rows, dr = C.chord_steps(l, spb, k, int(math.ceil(total / k)) * k)
+            per_perf = min(per_perf, C.chord_capacity(K) * k); align = align * (k // math.gcd(16, k)) // math.gcd(align, k // math.gcd(16, k))
+            steps.append(('chords', k, rows))
+            report.append(f"{l['name']}: {len(l['notes'])} notes as {K}-note chords, one step = {chord_step_label(k, spb)}" + (f', {dr} notes above {K} per chord left out' if dr else ''))
+        else:
+            st, dr = to_steps(l, spb, total); steps.append(('line', 1, st))
+            report.append(f"{l['name']}: {len(l['notes'])} notes" + (f', {dr} merged by quantizing' if dr else ''))
+    nbars = total // 16
+    control = parts < 4 and len(steps) < 4
+    ranges = perf_ranges(steps, nbars, per_perf, S['short'], control, align)
+    nperf = len(ranges)
+    roles = [role(i, lambda: default_sound(l, i, len(chosen))) for i, l in enumerate(chosen)]
+    secs = total / spb * 60 / bpm
+    summary = [f"Source: {S['source']}", f'Tempo {bpm:.1f} BPM, grid {GRID_NAMES[spb]} -> G2 master clock {g2bpm} BPM (step clock = 1/96 divided by {div})',
+               f'Length {nbars} x 16 steps, {int(secs // 60)}:{int(secs % 60):02d}; {nperf} performance(s) (' + ', '.join(str(b1 - b0) for b0, b1 in ranges) + ' x 16 steps; each file under 64 KB)',
+               'Slots: ' + '; '.join(f'{"ABCD"[i]} = {r} (starts on variation {roles[i] + 1} {(C.CHORD_SOUNDS if chosen[i]["kind"] == "chords" else SOUNDS)[roles[i]][0]})' for i, r in enumerate(report))]
+    if section: summary.insert(1, f'Section: beats {section[0]:g} to {section[1]:g}')
+    if dropped_lines: summary.append('Not included: ' + ', '.join(f"{l['name']} ({len(l['notes'])} notes)" for l in dropped_lines))
+    preview = dict(bpm=bpm, spb=spb, parts=[dict(kind='chords', k=k, rows=st, avg=l['avg']) if kind == 'chords' else dict(kind='line', steps=st, avg=l['avg'])
+                                            for (kind, k, st), l in zip(steps, chosen)])
+    return dict(chain=False, name=S['name'], short=S['short'], steps=steps, roles=roles, ranges=ranges, nperf=nperf, per_perf=per_perf,
+                nbars=nbars, spb=spb, g2bpm=g2bpm, div=div, note=note, secs=secs, report=report, summary=summary, control=control,
+                loop=loop, preview=preview)
+
+def plan_chain(S, line, grid, section, bpm, pick_sound):
     """One track over up to 4 slots per performance (see chainslots.py)."""
     import chainslots as CS
     src = line
     if section: line = clip(line, *section)
-    spb = choose_grid([line], a.grid)
+    spb = choose_grid([line], grid)
     g2bpm, div, note = clock_plan(bpm, spb)
-    if note: print('! ' + note)
     end = (section[1] - section[0]) if section else max(x[1] for x in line['notes']); total = int(math.ceil(end * spb / 16)) * 16
     st, dr = to_steps(line, spb, total); nbars = total // 16; cap = CS.chain_capacity(); per_perf = 4 * cap
     nperf = math.ceil(nbars / per_perf)
-    outdir = a.out or os.path.join(os.path.dirname(os.path.abspath(a.midi)), f'{name} G2'); os.makedirs(outdir, exist_ok=True)
-    sound = a.sound - 1 if a.sound else ((7 if line['avg'] < 55 else 0) if (line.get('program') is None and line.get('sound') is None) else default_sound(line, 0, 1))
-    rest = [(REST, 0)] * 16
-    files, used = [], []
-    for pi in range(nperf):
-        b0, b1 = pi * per_perf, min(nbars, (pi + 1) * per_perf)
+    sound = pick_sound(line)
+    used = [math.ceil((min(nbars, (pi + 1) * per_perf) - pi * per_perf) / cap) for pi in range(nperf)]
+    secs = total / spb * 60 / bpm
+    report = [f"{line['name']}: {len(line['notes'])} notes" + (f', {dr} merged by quantizing' if dr else '')]
+    summary = [f"Source: {S['source']}", f'Tempo {bpm:.1f} BPM, grid {GRID_NAMES[spb]} -> G2 master clock {g2bpm} BPM (step clock = 1/96 divided by {div})',
+               f'Length {nbars} x 16 steps, {int(secs // 60)}:{int(secs % 60):02d}; {nperf} performance(s), one track chained over '
+               + ', '.join(str(u) for u in used) + f' slot(s), up to {cap} x 16 steps per slot',
+               f"Track: {report[0]} (starts on variation {sound + 1} {SOUNDS[sound][0]})"]
+    if section: summary.insert(1, f'Section: beats {section[0]:g} to {section[1]:g}')
+    others = [l for l in S['lines'] if l is not src and l['kind'] == 'line']
+    if others: summary.append('Not included: ' + ', '.join(f"{l['name']} ({len(l['notes'])} notes)" for l in others))
+    return dict(chain=True, name=S['name'], short=S['short'], st=st, cap=cap, sound=sound, used=used, roles=[sound], nperf=nperf,
+                per_perf=per_perf, nbars=nbars, spb=spb, g2bpm=g2bpm, div=div, note=note, secs=secs, report=report, summary=summary,
+                preview=dict(bpm=bpm, spb=spb, parts=[dict(kind='line', steps=st, avg=line['avg'])]))
+
+def write(P, outdir):
+    """Build the patches of a plan() into outdir (slow: g2ools). -> paths of the written performances."""
+    os.makedirs(outdir, exist_ok=True)
+    files = _write_chain(P, outdir) if P['chain'] else _write_parts(P, outdir)
+    open(f'{outdir}/CONVERSION.txt', 'w', encoding='utf-8', newline='\n').write('\n'.join(P['summary']) + '\n')
+    return files
+
+def _write_parts(P, outdir):
+    name, short, nperf, div = P['name'], P['short'], P['nperf'], P['div']
+    files = []
+    for pi, (b0, b1) in enumerate(P['ranges']):
         tag = f' {pi + 1}of{nperf}' if nperf > 1 else ''
-        nslots = math.ceil((b1 - b0) / cap); used.append(nslots)
         slots, gk = [], []
-        for si in range(nslots):
+        for si, (kind, k, st) in enumerate(P['steps']):
+            ppath = f'{outdir}/{name}{tag} {"ABCD"[si]}.pch2'
+            if kind == 'chords':
+                c0, c1 = b0 * 16 // k, b1 * 16 // k                  # chord steps of this performance
+                nseq = math.ceil((c1 - c0) / 16); last = (c1 - c0) - 16 * (nseq - 1)
+                rb = [[row[c0 + 16 * q: min(c1, c0 + 16 * q + 16)] for q in range(nseq)] for row in st]
+                rb = [[bar + [(bar[-1][0], 0)] * (16 - len(bar)) for bar in rows] for rows in rb]   # pad the last sequencer
+                pf, sy = C.chord_patch(rb, k, P['roles'][si], ppath, last_len=last, loop=P['loop'], div=div)
+            else:
+                bars = [st[16 * b:16 * b + 16] for b in range(b0, b1)]
+                pf, sy = part_patch('', bars, P['roles'][si], ppath, loop=P['loop'], div=div)
+            slots.append(dict(name=f'{short} {"ABCD"[si]}', patch=pf, enabled=1, keyboard=0))
+            fl = find(pf, 'Filter'); am = find(pf, 'Amp Env')
+            gk += [(si, si, fl.params.Freq), (4 + si, si, am.params.Release), (8 + si, si, am.params.Attack)]
+        if P['control']:
+            D = control_patch(f'{outdir}/{name}{tag} Control.pch2')
+            slots.append(dict(name=f'{short[:9]} Ctrl', patch=D, enabled=1, keyboard=1))
+            cs = len(slots) - 1                                     # the control slot follows the parts
+            gk += [(3, cs, find(D, 'Room').params.Time), (7, cs, find(D, 'Return L').params.Lev1), (11, cs, find(D, 'Return R').params.Lev1)]
+        while len(slots) < 4:
+            slots.append(dict(name='Free', patch=free_patch(f'{outdir}/Free.pch2'), enabled=0, keyboard=0))
+        pp = f'{outdir}/{name}{tag}.prf2'
+        write_prf2(pp, slots, bpm=P['g2bpm'], global_knobs=gk); files.append(pp)
+    return files
+
+def _write_chain(P, outdir):
+    import chainslots as CS
+    name, short, nperf, cap, per_perf, st = P['name'], P['short'], P['nperf'], P['cap'], P['per_perf'], P['st']
+    rest = [(REST, 0)] * 16
+    files = []
+    for pi in range(nperf):
+        b0, b1 = pi * per_perf, min(P['nbars'], (pi + 1) * per_perf)
+        tag = f' {pi + 1}of{nperf}' if nperf > 1 else ''
+        slots, gk = [], []
+        for si in range(P['used'][pi]):
             c0 = b0 + si * cap; c1 = min(b1, c0 + cap)
             bars = [st[16 * b:16 * b + 16] for b in range(c0, c1)] + [rest] * (cap - (c1 - c0))
-            pf, sy = CS.chain_slot(CS.ROLES[si], bars, sound, f'{outdir}/{name}{tag} {CS.ROLES[si]}.pch2', div)
+            pf, sy = CS.chain_slot(CS.ROLES[si], bars, P['sound'], f'{outdir}/{name}{tag} {CS.ROLES[si]}.pch2', P['div'])
             slots.append(dict(name=f'{short} {CS.ROLES[si]}', patch=pf, enabled=1, keyboard=0))
             fl, am = find(pf, 'Filter'), find(pf, 'Amp Env')
             gk += [(si, si, fl.params.Freq), (4 + si, si, am.params.Release), (8 + si, si, am.params.Attack)]
         while len(slots) < 4: slots.append(dict(name='Free', patch=free_patch(f'{outdir}/Free.pch2'), enabled=0, keyboard=0))
-        pp = f'{outdir}/{name}{tag}.prf2'; write_prf2(pp, slots, bpm=g2bpm, global_knobs=gk); files.append(pp)
-    secs = total / spb * 60 / bpm
-    summary = [f'Source: {os.path.basename(a.midi)}', f'Tempo {bpm:.1f} BPM, grid {GRID_NAMES[spb]} -> G2 master clock {g2bpm} BPM (step clock = 1/96 divided by {div})',
-               f'Length {nbars} x 16 steps, {int(secs // 60)}:{int(secs % 60):02d}; {nperf} performance(s), one track chained over '
-               + ', '.join(str(u) for u in used) + f' slot(s), up to {cap} x 16 steps per slot',
-               f"Track: {line['name']}: {len(line['notes'])} notes" + (f', {dr} merged by quantizing' if dr else '') + f' (starts on variation {sound + 1} {SOUNDS[sound][0]})']
-    if section: summary.insert(1, f'Section: beats {section[0]:g} to {section[1]:g}')
-    others = [l for l in lines if l is not src and l['kind'] == 'line']
-    if others: summary.append('Not included: ' + ', '.join(f"{l['name']} ({len(l['notes'])} notes)" for l in others))
-    open(f'{outdir}/CONVERSION.txt', 'w', encoding='utf-8', newline='\n').write('\n'.join(summary) + '\n')
-    print('\n'.join(summary)); print('wrote', *files, sep='\n  ')
+        pp = f'{outdir}/{name}{tag}.prf2'; write_prf2(pp, slots, bpm=P['g2bpm'], global_knobs=gk); files.append(pp)
+    return files
+
 
 # ---------------------------------------------------------------- main
 def main():
@@ -431,23 +550,8 @@ def main():
     ap.add_argument('--end', type=float, help='section end in beats (default: end of the file)')
     ap.add_argument('--no-loop', action='store_true'); ap.add_argument('--bpm', type=float, help='override the file tempo')
     a = ap.parse_args()
-    name = re.sub(r' +', ' ', re.sub(r'[^A-Za-z0-9 \-]', ' ', os.path.splitext(os.path.basename(a.midi))[0])).strip()[:40] or 'Song'
-    short = name[:10].strip()
-    magic = open(a.midi, 'rb').read(4)
-    if magic in (b'NESM', b'NSFE', b'PSID', b'RSID'):            # chip music: run the tune's own player (see nsf.py / sid.py)
-        if magic in (b'PSID', b'RSID'): import sid; tracks, bpm, info = sid.read_sid(open(a.midi, 'rb').read(), a.song); kind = 'SID'
-        else: import nsf; tracks, bpm, info = nsf.read_nsf(open(a.midi, 'rb').read(), a.song); kind = 'NSF'
-        name = f"{name[:34].strip()} s{info['song']}"; short = name[:10].strip()
-        print(f"{kind}: {info['title'] or 'untitled'}, song {info['song']} of {info['songs']}" + (f", loop found after {info['loop_end']} frames" if info['loop_end'] else ', no loop found (4 minutes read)'))
-    else: tracks, bpm = read_midi(a.midi, a.bends)
-    bpm = a.bpm or bpm
-    lines = []
-    for tid, t in enumerate(tracks):
-        ls = split_lines(t); chordal = len(ls) > 1 and C.is_chordal(t)
-        for l in ls: l['kind'] = 'line'; l['in_chords'] = chordal; l['tid'] = tid; lines.append(l)
-        if chordal: lines.append(dict(kind='chords', name=f"{t['name']} chords", notes=t['notes'], in_chords=False, program=t.get('program'), tid=tid))
-    for i, l in enumerate(lines):
-        ps = [x[2] for x in l['notes']]; l['id'] = i; l['avg'] = sum(ps) / len(ps)
+    S = load_song(a.midi, a.bends, a.song); lines, info = S['lines'], S['info']
+    if info: print(f"{S['kind']}: {info['title'] or 'untitled'}, song {info['song']} of {info['songs']}" + (f", loop found after {info['loop_end']} frames" if info['loop_end'] else ', no loop found (4 minutes read)'))
     if a.list or not lines:
         for l in lines: print(f"{l['id']:3d}  {len(l['notes']):5d} notes  avg {l['avg']:5.1f}  {l['name']}" + ('  [chords]' if l['kind'] == 'chords' else '') + (f"  (GM {l['program'] + 1} {GM_NAMES[l['program']]})" if l.get('program') is not None else ''))
         return
@@ -456,79 +560,13 @@ def main():
         file_end = max(x[1] for l in lines for x in l['notes'])
         section = (max(0.0, a.start or 0.0), min(file_end, a.end) if a.end is not None else file_end)
         if section[0] >= section[1]: raise SystemExit('--start must be before --end')
-    if a.chain:
-        cand = [lines[int(x)] for x in a.pick.split(',')][:1] if a.pick else sorted([l for l in lines if l['kind'] == 'line'], key=lambda l: -len(l['notes']))[:1]
-        if not cand or cand[0]['kind'] != 'line': raise SystemExit('--chain needs a single-note line (not a chord item)')
-        return write_chain(a, name, short, cand[0], lines, bpm, section)
-    if a.pick: chosen = [lines[int(x)] for x in a.pick.split(',')]
-    else: chosen = default_pick(lines, a.parts)
-    dropped_lines = [l for l in lines if l['id'] not in {c['id'] for c in chosen} and not (l['in_chords'] and any(c['kind'] == 'chords' for c in chosen))]
-    spb = choose_grid(chosen, a.grid)
-    g2bpm, div, note = clock_plan(bpm, spb)
-    if note: print('! ' + note)
-    ids = {l['id'] for l in chosen}
-    if section: chosen = [clip(l, *section) for l in chosen]
-    end = (section[1] - section[0]) if section else max(x[1] for l in chosen for x in l['notes'])
-    nv, nf = capacity(); per_perf = nv + nf
-    cinfo = {}
-    for l in chosen:
-        if l['kind'] == 'chords':
-            k = C.choose_chord_step(l, spb); cinfo[l['id']] = k
-    total = int(math.ceil(end * spb / 16)) * 16
-    parts, report, align = [], [], 1                # align: performances must start on a whole chord step
-    for l in chosen:
-        if l['kind'] == 'chords':
-            k = cinfo[l['id']]; K, rows, dr = C.chord_steps(l, spb, k, int(math.ceil(total / k)) * k)
-            per_perf = min(per_perf, C.chord_capacity(K) * k); align = align * (k // math.gcd(16, k)) // math.gcd(align, k // math.gcd(16, k))
-            parts.append(('chords', k, rows))
-            report.append(f"{l['name']}: {len(l['notes'])} notes as {K}-note chords, one step = {chord_step_label(k, spb)}" + (f', {dr} notes above {K} per chord left out' if dr else ''))
-        else:
-            st, dr = to_steps(l, spb, total); parts.append(('line', 1, st))
-            report.append(f"{l['name']}: {len(l['notes'])} notes" + (f', {dr} merged by quantizing' if dr else ''))
-    nbars = total // 16
-    ranges = perf_ranges(parts, nbars, per_perf, short, a.parts < 4 and len(parts) < 4, align)
-    nperf = len(ranges)
-    outdir = a.out or os.path.join(os.path.dirname(os.path.abspath(a.midi)), f'{name} G2'); os.makedirs(outdir, exist_ok=True)
-    roles = []
-    for i, l in enumerate(chosen):
-        if a.sound: roles.append(a.sound - 1)
-        else: roles.append(default_sound(l, i, len(chosen)))
-    secs = total / spb * 60 / bpm
-    files = []
-    for pi, (b0, b1) in enumerate(ranges):
-        tag = f' {pi + 1}of{nperf}' if nperf > 1 else ''
-        slots, gk = [], []
-        for si, (kind, k, st) in enumerate(parts):
-            ppath = f'{outdir}/{name}{tag} {"ABCD"[si]}.pch2'
-            if kind == 'chords':
-                c0, c1 = b0 * 16 // k, b1 * 16 // k                  # chord steps of this performance
-                nseq = math.ceil((c1 - c0) / 16); last = (c1 - c0) - 16 * (nseq - 1)
-                rb = [[row[c0 + 16 * q: min(c1, c0 + 16 * q + 16)] for q in range(nseq)] for row in st]
-                rb = [[bar + [(bar[-1][0], 0)] * (16 - len(bar)) for bar in rows] for rows in rb]   # pad the last sequencer
-                pf, sy = C.chord_patch(rb, k, roles[si], ppath, last_len=last, loop=not a.no_loop, div=div)
-            else:
-                bars = [st[16 * b:16 * b + 16] for b in range(b0, b1)]
-                pf, sy = part_patch('', bars, roles[si], ppath, loop=not a.no_loop, div=div)
-            slots.append(dict(name=f'{short} {"ABCD"[si]}', patch=pf, enabled=1, keyboard=0))
-            fl = find(pf, 'Filter'); am = find(pf, 'Amp Env')
-            gk += [(si, si, fl.params.Freq), (4 + si, si, am.params.Release), (8 + si, si, am.params.Attack)]
-        if a.parts < 4 and len(parts) < 4:
-            D = control_patch(f'{outdir}/{name}{tag} Control.pch2')
-            slots.append(dict(name=f'{short[:9]} Ctrl', patch=D, enabled=1, keyboard=1))
-            cs = len(slots) - 1                                     # the control slot follows the parts
-            gk += [(3, cs, find(D, 'Room').params.Time), (7, cs, find(D, 'Return L').params.Lev1), (11, cs, find(D, 'Return R').params.Lev1)]
-        while len(slots) < 4:
-            slots.append(dict(name='Free', patch=free_patch(f'{outdir}/Free.pch2'), enabled=0, keyboard=0))
-        pp = f'{outdir}/{name}{tag}.prf2'
-        write_prf2(pp, slots, bpm=g2bpm, global_knobs=gk); files.append(pp)
-    grid_name = {2: '8ths', 3: '8th triplets', 4: '16ths', 6: '16th triplets', 8: '32nds', 12: '32nd triplets'}[spb]
-    summary = [f'Source: {os.path.basename(a.midi)}', f'Tempo {bpm:.1f} BPM, grid {grid_name} -> G2 master clock {g2bpm} BPM (step clock = 1/96 divided by {div})',
-               f'Length {nbars} x 16 steps, {int(secs // 60)}:{int(secs % 60):02d}; {nperf} performance(s) (' + ', '.join(str(b1 - b0) for b0, b1 in ranges) + ' x 16 steps; each file under 64 KB)',
-               'Slots: ' + '; '.join(f'{"ABCD"[i]} = {r} (starts on variation {roles[i] + 1} {(C.CHORD_SOUNDS if chosen[i]["kind"] == "chords" else SOUNDS)[roles[i]][0]})' for i, r in enumerate(report))]
-    if section: summary.insert(1, f'Section: beats {section[0]:g} to {section[1]:g}')
-    if dropped_lines: summary.append('Not included: ' + ', '.join(f"{l['name']} ({len(l['notes'])} notes)" for l in dropped_lines))
-    open(f'{outdir}/CONVERSION.txt', 'w', encoding='utf-8', newline='\n').write('\n'.join(summary) + '\n')
-    print('\n'.join(summary)); print('wrote', *files, sep='\n  ')
+    try:
+        P = plan(S, pick=[int(x) for x in a.pick.split(',')] if a.pick else None, parts=a.parts, grid=a.grid, sound=a.sound,
+                 chain=a.chain, section=section, bpm=a.bpm, loop=not a.no_loop)
+    except ValueError as e: raise SystemExit(str(e))
+    if P['note']: print('! ' + P['note'])
+    files = write(P, a.out or os.path.join(os.path.dirname(os.path.abspath(a.midi)), f"{S['name']} G2"))
+    print('\n'.join(P['summary'])); print('wrote', *files, sep='\n  ')
 
 
 if __name__ == '__main__':
