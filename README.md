@@ -5,30 +5,7 @@ the whole piece from the G2's own sequencers, synced to the master clock.
 
 Not affiliated with Clavia. "Nord Modular G2" is used only to say which instrument the files are for.
 
-## Two ways to use it
-
-| | Browser app | Command line |
-|---|---|---|
-| Install | nothing | Python, Git, g2ools (one-time setup below) |
-| Best for | trying it out, picking lines by ear | batch work, scripting, exact options |
-| Output | a zip you download | a folder next to your file |
-
-Both produce byte-identical `.prf2`/`.pch2` files for the same settings.
-
-## Option 1: the browser app (no install)
-
-1. Get the project: on this GitHub page click **Code → Download ZIP** and unzip it (or use the GitHub Pages site if it
-   is turned on for this repository).
-2. Open `docs/index.html` in Chrome, Firefox, Edge or Safari (double-click it).
-3. Drop a `.mid`, `.nsf`, `.nsfe` or `.sid` file onto the big display, or click it to choose one.
-   Want something to try? Use the files in `examples/`.
-4. Choose which lines go to slots A–D and the mode (3 parts + control slot, 4 parts, or one line chained A→B→C→D).
-5. Press play to hear a preview, and change the choices until it sounds right.
-6. Save. You get a zip with the `.prf2` performance, one `.pch2` patch per slot and a `CONVERSION.txt` report.
-
-Everything runs on your own computer; your file is never uploaded.
-
-## Option 2: the command line
+## Install and run
 
 ### What you need
 
@@ -181,12 +158,11 @@ Run `python python/midi2g2.py --help` for the full list.
 | Path | What |
 |---|---|
 | `python/` | the converter (`midi2g2.py`), readers (`nsf.py`, `sid.py`), chord and chain slots, `g2lib.py` helpers, `verify.py` |
-| `python/templates.json` | pre-built, verified patch templates used by the web app (`make_templates.py` regenerates them) |
-| `web/` | web app sources; `build.py` assembles them into `docs/index.html` |
-| `tests/` | public-domain test inputs, `cases.txt`, and `run_tests.py` (Python output checked with `verify.py`, then compared byte for byte with the web app via node) |
+| `python/templates.json` | pre-built, verified patch templates with their sizes (`make_templates.py` regenerates them) |
+| `tests/` | public-domain test inputs, `cases.txt`, and `run_tests.py` (converts every case and checks it with `verify.py`) |
 | `examples/` | public-domain example files (Ode to Joy as MIDI, NSF, NSFe and SID) |
 
-After editing: `python python/make_templates.py` (only if patch layouts changed), `python build.py`, `python tests/run_tests.py`.
+After editing: `python python/make_templates.py` (only if patch layouts changed), then `python tests/run_tests.py`.
 
 ## License
 

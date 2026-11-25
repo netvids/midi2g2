@@ -3,3 +3,9 @@ __pycache__/
 .DS_Store
 # converter output
 * G2/
+
+# web version: kept locally, not published yet
+web/
+docs/
+build.py
+tests/compare.js
