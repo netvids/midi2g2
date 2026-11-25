@@ -73,8 +73,8 @@ def frames(data, song):
     mc = Machine(data); mc.reset(song); m = mc.m
     out, gate = [], [0, 0, 0]
     if mc.play == 0: return out, mc.fps, mc.clock
-    for _ in range(int(MAX_SECONDS * mc.fps)):
-        mc.ctrl_writes = []
+    for f in range(int(MAX_SECONDS * mc.fps)):
+        if f: mc.ctrl_writes = []                                   # frame 0 keeps init's writes: some tunes open the gate there, once
         if not mc.run(mc.play, irq=mc.irq): break
         trig = [False, False, False]
         for v, val in mc.ctrl_writes:
