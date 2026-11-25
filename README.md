@@ -128,7 +128,7 @@ Examples:
 
 ```
 python python/midi2g2.py song.mid --pick 3,0,5 --parts 4 --grid 4 --start 32 --end 96
-python python/midi2g2.py game.nsf --song 2
+python python/midi2g2.py tune.nsf --song 2
 python python/midi2g2.py tune.sid --chain
 ```
 
@@ -160,7 +160,7 @@ Run `python python/midi2g2.py --help` for the full list.
 - **MIDI:** tracks are split into monophonic lines (legato overlaps kept together); chord tracks can play as one
   chord slot (up to 4 notes). Note On/Off pairing, All Notes Off and pitch bend (with RPN range) follow MIDI 1.0.
   General MIDI programs choose a fitting starting sound.
-- **NSF / NSFe:** the game's sound driver runs on a built-in 6502 emulator; pulse 1, pulse 2 and triangle become lines
+- **NSF / NSFe:** the file's own sound driver runs on a built-in 6502 emulator; pulse 1, pulse 2 and triangle become lines
   (plus VRC6 and VRC7 channels). Loops are detected, the tempo is estimated.
 - **SID:** the tune's player runs the same way; the three SID voices become lines.
 - **On the G2:** each slot is a mono patch with chained 16-step SeqNote sequencers and its synth in the voice area.

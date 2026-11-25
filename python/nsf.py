@@ -1,6 +1,6 @@
 """NSF (NES Sound Format) reader for midi2g2.
 
-An .nsf file is the game's own 6502 sound driver plus its data. To get notes the driver has to run: this module
+An .nsf file holds its own 6502 sound driver plus the music data. To get notes the driver has to run: this module
 emulates the CPU (py65), calls the driver's play routine once per frame, records what it writes to the NES sound
 chip (APU, $4000-$4017), models the chip's envelopes / length counters / sweeps per frame, and turns the result
 into notes for the two pulse channels and the triangle channel. Noise and DMC (drums / samples) are skipped.
