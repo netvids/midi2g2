@@ -42,8 +42,8 @@ git --version
 **1. Download the project**
 
 ```
-git clone https://github.com/netvids/g2tomidi.git
-cd g2tomidi
+git clone https://github.com/netvids/midi2g2.git
+cd midi2g2
 ```
 
 **2. Install g2ools.** midi2g2 writes G2 files with [g2ools](https://github.com/msg/g2ools). This script downloads the
