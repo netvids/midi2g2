@@ -3,6 +3,16 @@
 Turn a **MIDI**, **NSF / NSFe** or **SID** (Commodore 64) file into a **Nord Modular G2 performance** that plays
 the whole piece from the G2's own sequencers, synced to the master clock.
 
+**Two ways to use it**, both on your own computer after a one-time [install](#install-once):
+
+- 🌐 **In your browser (easiest):** run `python python/gui.py` and the midi2g2 page opens in your web browser.
+  Drop a file, choose the parts, listen to a preview and save the G2 files. No command-line options to learn.
+  [How to use the browser page](#use-it-in-your-browser)
+- ⌨️ **From the command line:** `python python/midi2g2.py song.mid`, for scripts and batch work.
+  [Command-line guide](#convert-your-own-files-from-the-command-line)
+
+Both give exactly the same files for the same choices.
+
 Not affiliated with Clavia. "Nord Modular G2" is used only to say which instrument the files are for.
 
 ## Install and run
@@ -63,14 +73,26 @@ python python/midi2g2.py "examples/Ode to Joy test.mid"
 You should see the tempo, length and slots it chose, then `wrote ...`. The result is in a new folder,
 `examples/Ode to Joy test G2/`.
 
-### Use it in your browser (easiest)
+**5. Open it in your browser:**
 
 ```
 python python/gui.py
 ```
 
-Your browser opens the midi2g2 page (at `http://127.0.0.1:8000`; if it doesn't open by itself, paste that address).
-Leave the terminal open while you use it, and press **Ctrl+C** there to stop.
+That's it: the midi2g2 page opens in your browser. Next time, you only need this one command (from the project
+folder).
+
+### Use it in your browser
+
+Start it from the project folder:
+
+```
+python python/gui.py
+```
+
+Your web browser opens the midi2g2 page by itself. If it doesn't, open your browser and go to
+**http://127.0.0.1:8000** (if that port was busy, the terminal shows the address it used instead).
+Keep the terminal window open while you use the page; press **Ctrl+C** in it when you're done.
 
 1. Drop a `.mid`, `.nsf`, `.nsfe` or `.sid` file onto the big display, or click it to choose one.
    Want something to try? Use the files in `examples/`.
