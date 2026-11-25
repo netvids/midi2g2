@@ -1,6 +1,6 @@
 # midi2g2
 
-Turn a **MIDI**, **NSF / NSFe** (NES) or **SID** (Commodore 64) file into a **Nord Modular G2 performance** that plays
+Turn a **MIDI**, **NSF / NSFe** or **SID** (Commodore 64) file into a **Nord Modular G2 performance** that plays
 the whole piece from the G2's own sequencers, synced to the master clock.
 
 Not affiliated with Clavia. "Nord Modular G2" is used only to say which instrument the files are for.
@@ -48,7 +48,7 @@ export G2OOLS=/path/to/g2ools          # macOS / Linux / Git Bash
 $env:G2OOLS = "C:\path\to\g2ools"      # Windows PowerShell
 ```
 
-**3. Install the Python packages** (`mido` reads MIDI; `py65` runs NES and C64 music drivers):
+**3. Install the Python packages** (`mido` reads MIDI; `py65` runs the music drivers inside NSF / NSFe and SID files):
 
 ```
 pip install -r requirements.txt
@@ -172,7 +172,7 @@ Run `python python/midi2g2.py --help` for the full list.
 - About 31 bars of 16 steps per melody slot (29 per chained slot); longer pieces split into numbered performances.
 - Performance files are kept under 64 KB (the G2 editor refuses bigger ones).
 - Note pitches never travel between areas or slots; only short start pulses do.
-- Drums (MIDI channel 10, NES noise/DMC) are skipped; extra NES sound chips other than VRC6/VRC7 are not read.
+- Drums (MIDI channel 10, NSF noise/DMC channels) are skipped; extra NSF sound chips other than VRC6/VRC7 are not read.
 
 ## Repository
 

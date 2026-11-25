@@ -1,7 +1,7 @@
-"""NSF (NES Sound Format) reader for midi2g2.
+"""NSF / NSFe reader for midi2g2.
 
 An .nsf file holds its own 6502 sound driver plus the music data. To get notes the driver has to run: this module
-emulates the CPU (py65), calls the driver's play routine once per frame, records what it writes to the NES sound
+emulates the CPU (py65), calls the driver's play routine once per frame, records what it writes to the sound
 chip (APU, $4000-$4017), models the chip's envelopes / length counters / sweeps per frame, and turns the result
 into notes for the two pulse channels and the triangle channel. Noise and DMC (drums / samples) are skipped.
 NSF files have no tempo, so one is estimated from the note starts.
@@ -95,7 +95,7 @@ class Machine:
         c.pc = addr
         for _ in range(CALL_LIMIT):
             if c.pc == RET or m[c.pc] == 0x00: return True       # returned (or hit BRK: the driver is done for this call)
-            c.step(); c.p &= 0xF7                                 # the NES CPU has no decimal mode
+            c.step(); c.p &= 0xF7                                 # this 6502 has no decimal mode
         return False
 
 def frame_limit(h, song):
